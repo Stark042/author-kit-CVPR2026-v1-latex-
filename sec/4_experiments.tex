@@ -34,36 +34,31 @@ We quantify explanation quality using insertion and deletion curves. The inserti
 
 \paragraph{Pointing Game.}
 We further evaluate localization quality using the pointing game metric, which checks whether the most salient point in the Grad-CAM heatmap falls within the predicted object region.
+
 \paragraph{Frequency Bias Analysis.}
-Let $\mathcal{C}$ denote the set of in-distribution (ID) classes. We quantify class-frequency bias by comparing: (i) the empirical class prior from training data, $p_{\mathrm{tr}}(c)$, and (ii) the normalized predicted-class distribution on evaluation data, $\hat{p}(c)$:
-\begin{equation}
-    \hat{p}(c)=\frac{N_c}{\sum_{k\in\mathcal{C}}N_k}, \qquad c\in\mathcal{C},
-\end{equation}
-where $N_c$ is the number of detections assigned to class $c$ above confidence threshold $\tau$.
+Let $\mathcal{C}$ denote the set of in-distribution (ID) classes. We analyze class-frequency bias by comparing class-wise detection counts between training-time distribution and model predictions at inference.
 
-We then compute a prior-alignment bias score using Kullback--Leibler divergence,
+For a given model, let $N_c$ denote the number of detections assigned to class $c \in \mathcal{C}$ above confidence threshold $\tau$. We define the normalized predicted class distribution as:
 \begin{equation}
-    B_{\mathrm{KL}} = \sum_{c\in\mathcal{C}}\hat{p}(c)\log\frac{\hat{p}(c)}{p_{\mathrm{tr}}(c)+\varepsilon},
-\end{equation}
-and a concentration score,
-\begin{equation}
-    B_{\mathrm{HHI}} = \sum_{c\in\mathcal{C}} \hat{p}(c)^2,
-\end{equation}
-where higher $B_{\mathrm{HHI}}$ indicates stronger collapse toward a few dominant classes.
-
-To further capture systematic bias toward frequent classes, we compute rank correlation:
-\begin{equation}
-    \rho_{\mathrm{freq}} = \mathrm{corr}\!\left(\{\hat{p}(c)\}, \{p_{\mathrm{tr}}(c)\}\right).
+    \hat{p}(c)=\frac{N_c}{\sum_{k\in\mathcal{C}}N_k}, \qquad c\in\mathcal{C}.
 \end{equation}
 
-Lower values of $B_{\mathrm{HHI}}$ and $\rho_{\mathrm{freq}}$ indicate improved class balance and reduced reliance on dataset frequency priors.
+This provides an empirical estimate of how frequently each class is predicted by the detector under evaluation.
+
+To study bias shift induced by fine-tuning, we compare the predicted class distributions of the baseline and fine-tuned models. Let $\hat{p}_{\mathrm{base}}(c)$ and $\hat{p}_{\mathrm{ft}}(c)$ denote these distributions respectively. The change in class preference is analyzed qualitatively by observing shifts in dominant predicted categories:
+\begin{equation}
+    \Delta p(c) = \hat{p}_{\mathrm{ft}}(c) - \hat{p}_{\mathrm{base}}(c).
+\end{equation}
+
+A reduction in dominance of a few classes and a more balanced distribution across $\mathcal{C}$ indicates reduced frequency bias after fine-tuning.
 
 \vspace{0.5em}
-Although OoD-aware fine-tuning improves robustness, it does not explicitly constrain low-level spectral artifacts at inference time. Let the detection score be $s = g(z)$ for feature representation $z$. Under distribution shift, high-frequency perturbations $\delta_{\mathrm{hf}}$ can inflate scores:
+Although OoD-aware fine-tuning improves robustness at the semantic level, it does not explicitly address low-level spectral sensitivity in detections. Let the detection score be $s = g(z)$ for feature representation $z$. Under distribution shift, high-frequency perturbations may influence feature activations and lead to inflated detection scores:
 \begin{equation}
-    \Delta s \approx \nabla_z g(z)^\top \delta_{\mathrm{hf}} > 0
+    \Delta s \approx \nabla_z g(z)^\top \delta_{\mathrm{hf}}.
 \end{equation}
-for non-object regions. This motivates a lightweight post-hoc correction mechanism.
+
+This motivates a post-hoc correction mechanism that reduces such spurious activations using frequency-aware suppression during inference.
 
 \paragraph{Frequency Estimation.}
 Given a detection patch $x \in \mathbb{R}^{H\times W}$, we estimate high-frequency content using the discrete Laplacian:
