@@ -1,7 +1,11 @@
 \begin{abstract}
-The ABSTRACT is to be in fully justified italicized text, at the top of the left-hand column, below the author and affiliation information.
-Use the word ``Abstract'' as the title, in 12-point Times, boldface type, centered relative to the column, initially capitalized.
-The abstract is to be in 10-point, single-spaced type.
-Leave two blank lines after the Abstract, then begin the main text.
-Look at previous \confName abstracts to get a feel for style and length.
+Out-of-distribution (OoD) inputs remain a major failure mode in modern object detectors, often leading to overconfident hallucinated detections on semantically irrelevant or unknown regions. While recent approaches focus on post-hoc scoring functions or curated OoD datasets, they largely overlook the role of low-level signal characteristics in driving such failures.
+
+In this work, we investigate how frequency bias and object scale contribute to objectness miscalibration in real-time object detectors. Building on observations from spectral bias in deep neural networks, we show that high-frequency textures and small object regions disproportionately trigger false positive detections under OoD settings. To address this, we propose a frequency-aware objectness calibration framework that adaptively suppresses detection confidence based on local frequency energy, objectness priors, and bounding box scale.
+
+Our method operates as a lightweight, post-hoc calibration mechanism that does not require additional training data or model modifications. We perform a comprehensive evaluation using both quantitative and explainability-driven metrics, including hallucination rate reduction, confidence redistribution, occlusion sensitivity, insertion-deletion faithfulness, and Grad-CAM-based localization consistency.
+
+Experimental results demonstrate that our approach achieves up to 27% reduction in false positive detections and significant improvement in hallucination rates on OoD datasets, while preserving in-distribution performance. Additionally, explainability analyses reveal improved alignment between model attention and semantically meaningful regions after calibration.
+
+Overall, this work highlights the importance of frequency-domain cues in OoD detection and provides a practical, low-compute strategy for mitigating hallucinations in real-time object detection systems.
 \end{abstract}
