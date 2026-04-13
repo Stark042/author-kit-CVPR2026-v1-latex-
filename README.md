@@ -2,7 +2,7 @@
 
 **Note:** the Microsoft Word version of the template is in the branch [`main-msword`](https://github.com/cvpr-org/author-kit/tree/main-msword).
 
-### History (in reverse chronological order)
+### History (in reverse chronological orders)
 
 - updated for CVPR 2026 [Vladimir Pavlovic](mailto:vladimir@rutgers.edu)
 - added styles for `subsubsection` and fixed the wrong PDF bookmarks by [Di Fang](https://github.com/fang-d)
