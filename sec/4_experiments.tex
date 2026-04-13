@@ -34,195 +34,135 @@ We quantify explanation quality using insertion and deletion curves. The inserti
 
 \paragraph{Pointing Game.}
 We further evaluate localization quality using the pointing game metric, which checks whether the most salient point in the Grad-CAM heatmap falls within the predicted object region.
-
 \paragraph{Frequency Bias Analysis.}
-Let $\mathcal{C}$ denote the ID class set. We quantify class-frequency bias by comparing: (i) the empirical class prior from training data, $p_{\mathrm{tr}}(c)$, and (ii) the normalized predicted-class distribution on evaluation data, $\hat{p}(c)$:
+Let $\mathcal{C}$ denote the set of in-distribution (ID) classes. We quantify class-frequency bias by comparing: (i) the empirical class prior from training data, $p_{\mathrm{tr}}(c)$, and (ii) the normalized predicted-class distribution on evaluation data, $\hat{p}(c)$:
 \begin{equation}
     \hat{p}(c)=\frac{N_c}{\sum_{k\in\mathcal{C}}N_k}, \qquad c\in\mathcal{C},
 \end{equation}
-where $N_c$ is the number of detections assigned to class $c$ above threshold $\tau$.
+where $N_c$ is the number of detections assigned to class $c$ above confidence threshold $\tau$.
 
 We then compute a prior-alignment bias score using Kullback--Leibler divergence,
 \begin{equation}
-    B_{\mathrm{KL}} = D_{\mathrm{KL}}\!\left(\hat{p}\,\|\,p_{\mathrm{tr}}\right)
-    =\sum_{c\in\mathcal{C}}\hat{p}(c)\log\frac{\hat{p}(c)}{p_{\mathrm{tr}}(c)+\varepsilon},
+    B_{\mathrm{KL}} = \sum_{c\in\mathcal{C}}\hat{p}(c)\log\frac{\hat{p}(c)}{p_{\mathrm{tr}}(c)+\varepsilon},
 \end{equation}
 and a concentration score,
 \begin{equation}
     B_{\mathrm{HHI}} = \sum_{c\in\mathcal{C}} \hat{p}(c)^2,
 \end{equation}
-where higher $B_{\mathrm{HHI}}$ indicates stronger collapse toward a few dominant classes. To isolate systematic bias toward frequent classes, we also report rank correlation between prediction mass and training frequency,
-\begin{equation}
-    \rho_{\mathrm{freq}} = \mathrm{corr}\!\left(\{\hat{p}(c)\}_{c\in\mathcal{C}},\{p_{\mathrm{tr}}(c)\}_{c\in\mathcal{C}}\right).
-\end{equation}
-Decreases in $B_{\mathrm{HHI}}$ and $\rho_{\mathrm{freq}}$ after fine-tuning indicate reduced reliance on dataset-frequency priors and improved class balance under shift.
+where higher $B_{\mathrm{HHI}}$ indicates stronger collapse toward a few dominant classes.
 
-Although OoD-aware fine-tuning regularizes high-level semantics, it does not explicitly constrain low-level spectral artifacts at inference. Let a detection score be $s=g(z)$ for feature representation $z$. Under distribution shift, high-frequency nuisance components can perturb features, $z\mapsto z+\delta_{\mathrm{hf}}$, causing score inflation
+To further capture systematic bias toward frequent classes, we compute rank correlation:
 \begin{equation}
-    \Delta s \approx \nabla_z g(z)^\top\delta_{\mathrm{hf}} > 0
+    \rho_{\mathrm{freq}} = \mathrm{corr}\!\left(\{\hat{p}(c)\}, \{p_{\mathrm{tr}}(c)\}\right).
 \end{equation}
-for non-object regions. This motivates an explicit post-hoc correction term that penalizes detections with large spectral energy and high objectness proxy. Therefore, we apply a lightweight multiplicative calibration directly on predictions, which is training-free, architecture-agnostic, and designed to suppress hallucinated detections without degrading real-time inference.
 
-\paragraph{Motivation}
-Empirical observations from our experiments indicate that:
-\begin{itemize}
-    \item High-frequency regions (e.g., textured backgrounds) frequently trigger false detections,
-    \item Small bounding boxes exhibit unstable and overconfident predictions,
-    \item These effects are amplified in OoD settings.
-\end{itemize}
+Lower values of $B_{\mathrm{HHI}}$ and $\rho_{\mathrm{freq}}$ indicate improved class balance and reduced reliance on dataset frequency priors.
 
-This behavior aligns with the known spectral bias of deep neural networks, where models tend to rely on high-frequency patterns.
+\vspace{0.5em}
+Although OoD-aware fine-tuning improves robustness, it does not explicitly constrain low-level spectral artifacts at inference time. Let the detection score be $s = g(z)$ for feature representation $z$. Under distribution shift, high-frequency perturbations $\delta_{\mathrm{hf}}$ can inflate scores:
+\begin{equation}
+    \Delta s \approx \nabla_z g(z)^\top \delta_{\mathrm{hf}} > 0
+\end{equation}
+for non-object regions. This motivates a lightweight post-hoc correction mechanism.
 
-\paragraph{Frequency Estimation}
-Given an image patch $x \in \mathbb{R}^{H\times W}$ associated with a detection, we estimate high-frequency content using the discrete Laplacian response:
+\paragraph{Frequency Estimation.}
+Given a detection patch $x \in \mathbb{R}^{H\times W}$, we estimate high-frequency content using the discrete Laplacian:
 \begin{equation}
-    \Delta x(p) = \sum_{q \in \mathcal{N}(p)} x(q) - 4x(p)
+    \Delta x(p) = \sum_{q \in \mathcal{N}(p)} x(q) - 4x(p),
 \end{equation}
-where $\mathcal{N}(p)$ denotes the 4-neighborhood of pixel $p$. The raw frequency energy is then defined as
+and compute frequency energy:
 \begin{equation}
-    e_f(x) = \frac{1}{|\Omega|} \sum_{p\in\Omega} |\Delta x(p)|^2,
+    e_f(x) = \frac{1}{|\Omega|} \sum_{p\in\Omega} |\Delta x(p)|^2.
 \end{equation}
-with $\Omega$ the patch domain. This quantity is proportional to the spectral second moment and emphasizes rapid spatial oscillations (edges/textures), which are frequently associated with OoD hallucination triggers.
 
-To make the measure comparable across images, we apply robust dataset-level normalization:
+We normalize using:
 \begin{equation}
-    z_f(x) = \frac{e_f(x) - \operatorname{med}(e_f)}{\operatorname{MAD}(e_f) + \varepsilon},
+    \hat{f}(x) = \min\!\left(\frac{e_f(x)}{Q_{75}(e_f)}, 2\right),
 \end{equation}
-where $\operatorname{med}(\cdot)$ and $\operatorname{MAD}(\cdot)$ are the median and median absolute deviation over the calibration set. Finally, we map to a bounded penalty term:
-\begin{equation}
-    \hat{f}(x) = \min\!\left(\max\!\left(\sigma\!\left(z_f(x)\right),\,0\right),\,1\right), \quad
-    \sigma(t)=\frac{1}{1+e^{-t}}.
-\end{equation}
-This bounded form prevents extreme suppression from outliers while preserving rank ordering of high-frequency detections.
+ensuring robustness across samples.
 
-\paragraph{Objectness Approximation}
-For one-stage detectors, the final confidence is approximately factorized as
+\paragraph{Calibration Function.}
+For each detection with confidence $s$, we compute:
 \begin{equation}
-    s \approx p_{\text{obj}}\, p_{\text{cls}|\text{obj}},
+    s' = s \cdot \exp(-\alpha \hat{f}) \cdot \frac{1}{\gamma(a)},
 \end{equation}
-where $p_{\text{obj}}$ is objectness and $p_{\text{cls}|\text{obj}}$ is class posterior. Since explicit $p_{\text{obj}}$ is not always exposed in exported predictions, we construct a monotonic proxy from confidence:
-\begin{equation}
-    o(s) = s^{\eta}, \qquad 0<\eta<1,
-\end{equation}
-and use $\eta=\tfrac{1}{2}$ in our experiments. The sublinear transform compresses very high confidences while preserving ordering, making suppression smoother for borderline detections. We further use a bounded form
-\begin{equation}
-    \hat{o}(s)=\min\!\left(\max\!\left(\frac{o(s)-\mu_o}{\sigma_o+\varepsilon},\,0\right),\,1\right),
-\end{equation}
-where $\mu_o,\sigma_o$ are mean and standard deviation of $o(s)$ estimated on validation predictions. This yields a stable, scale-aware objectness penalty for post-hoc calibration.
-
-\paragraph{Calibration Function}
-For each detection with confidence $s$, we compute the calibrated score:
-\begin{equation}
-    s' = s \cdot \exp(-\alpha \hat{f}) \cdot \exp(-\beta \hat{o}) \cdot \frac{1}{\gamma(a)}
-\end{equation}
-where:
-\begin{itemize}
-    \item $\alpha$ controls frequency suppression,
-    \item $\beta$ controls objectness suppression,
-    \item $a$ is bounding box area.
-\end{itemize}
-The size penalty is defined as:
+where $a$ is bounding box area and:
 \begin{equation}
     \gamma(a) =
     \begin{cases}
         \lambda, & a < \tau \\
-        1, & \text{otherwise}
+        1, & \text{otherwise}.
     \end{cases}
 \end{equation}
 
-\paragraph{Stability Constraint}
-To avoid artificial confidence boosting:
+To prevent artificial score inflation:
 \begin{equation}
-    s' = \min(s', s)
+    s' = \min(s', s).
 \end{equation}
-This ensures calibration only suppresses overconfident predictions.
 
-\paragraph{Variants}
-We evaluate two variants:
-\begin{itemize}
-    \item \textbf{Frequency-only calibration}: $s' = s \cdot \exp(-\alpha \hat{f}) / \gamma(a)$,
-    \item \textbf{Frequency + Objectness calibration}: $s' = s \cdot \exp(-\alpha \hat{f}) \cdot \exp(-\beta \hat{o}) / \gamma(a)$.
-\end{itemize}
+\paragraph{Implementation Details.}
+The calibration is applied post-hoc on detector outputs, requires no retraining, and involves only lightweight operations (Laplacian + scalar transforms), making it compatible with real-time detectors.
 
-\paragraph{Implementation Details}
-The method is applied post-hoc on detector outputs, requires no retraining or architecture modification, is computationally lightweight (Laplacian + scalar ops), and is compatible with real-time object detectors (YOLO variants).
-
-\paragraph{Key Insight}
-This formulation explicitly integrates frequency-domain cues into the detection pipeline, complementing training-time OoD exposure and providing an additional mechanism for suppressing hallucinated detections.
-
-\subsection{Experiment 1}
-
-\textit{Reserved for another experiment.}
+\paragraph{Key Insight.}
+This formulation introduces an explicit frequency-based regularization at inference time, complementing training-time OoD exposure.
 
 \subsection{Experiment 2}
 
 \paragraph{Experimental Setup.}
-We evaluate the proposed frequency-aware objectness calibration framework on both in-distribution (ID) and out-of-distribution (OoD) data. ID performance is measured on the Pascal VOC 2012 validation split, while OoD behavior is evaluated on a proximal OoD benchmark constructed from Caltech-256 categories that are visually similar yet semantically mismatched with VOC classes.
+We evaluate both baseline and fine-tuned YOLO detectors on in-distribution (Pascal VOC 2012) and OoD data (Caltech-256 subset). Fine-tuning is performed by treating OoD samples as background.
 
-Inference is performed with a fine-tuned YOLO detector, and calibration is applied strictly as a post-processing step (no retraining and no architecture modification). Unless stated otherwise, predictions are filtered with confidence threshold $\tau=0.25$.
+Inference is conducted with a confidence threshold of $\tau = 0.25$.
 
 \paragraph{Evaluation Metrics.}
-We report three OoD metrics:
+We report:
 \begin{itemize}
-    \item \textbf{Hallucination Rate (HR):} fraction of images with at least one detection above threshold.
-    \item \textbf{False Positive Count (FP):} total number of detections on the OoD set.
-    \item \textbf{Reduction (\%):} relative FP drop after calibration,
+    \item \textbf{False Positive Count (FP)}
+    \item \textbf{Hallucination Rate (HR)}
+    \item \textbf{Reduction (\%)}:
 \end{itemize}
-\begin{equation}
-    \mathrm{Reduction}(\%) = \frac{\mathrm{FP}_{\mathrm{raw}}-\mathrm{FP}_{\mathrm{cal}}}{\mathrm{FP}_{\mathrm{raw}}}\times 100.
-\end{equation}
 
-Table~\ref{tab:main_results} summarizes the OoD results.
+\begin{equation}
+    \mathrm{Reduction}(\%) = \frac{\mathrm{FP}_{\mathrm{base}}-\mathrm{FP}_{\mathrm{method}}}{\mathrm{FP}_{\mathrm{base}}} \times 100.
+\end{equation}
 
 \begin{table}[h]
 \centering
 \footnotesize
 \begin{tabular}{lccc}
 \hline
-Method & FP Count $\downarrow$ & HR $\downarrow$ & Reduction (\%) $\uparrow$ \\
+Method & FP $\downarrow$ & HR $\downarrow$ & Reduction (\%) $\uparrow$ \\
 \hline
 Baseline & 444 & 0.2096 & -- \\
 + Freq & 389 & 0.1899 & 12.38 \\
 + Freq + Obj & 324 & 0.1641 & 27.03 \\
 \hline
 \end{tabular}
-\caption{Quantitative comparison on OoD dataset. Lower is better for FP and HR, higher is better for reduction.}
-\label{tab:main_results}
+\caption{OoD detection performance comparison.}
 \end{table}
 
 \paragraph{Quantitative Results.}
-Relative to the baseline ($\mathrm{FP}=444$, $\mathrm{HR}=0.2096$), frequency-only calibration reduces false positives to 389 and HR to 0.1899, corresponding to a $12.38\%$ reduction. Adding objectness-aware suppression yields a larger gain: FP decreases to 324 and HR to 0.1641, achieving $27.03\%$ total reduction. These results indicate that frequency cues remove a substantial portion of spurious detections, while objectness modulation further suppresses overconfident false alarms.
+Fine-tuning alone reduces hallucinated detections by improving the decision boundary between foreground and background. Post-hoc calibration further suppresses false positives, achieving up to $27.03\%$ reduction. Frequency-based suppression removes a significant portion of texture-induced false detections.
 
 \paragraph{Qualitative Results.}
-Visual inspection shows that baseline predictions frequently include spurious boxes in cluttered and high-texture regions, whereas the calibrated model yields cleaner detections and more stable localization. In particular, frequency + objectness calibration reduces scattered small-box artifacts and improves alignment with semantically meaningful structures.
+We visualize detector outputs to compare baseline and fine-tuned behavior.
 
 \begin{figure}[t]
 \centering
 \setlength{\tabcolsep}{2pt}
 \begin{tabular}{cc}
-\IfFileExists{img1.jpg}{\includegraphics[width=0.23\textwidth]{img1.jpg}}{\fbox{\parbox[c][3.2cm][c]{0.23\textwidth}{\centering img1.jpg\\(baseline)}}} &
-\IfFileExists{img2.jpg}{\includegraphics[width=0.23\textwidth]{img2.jpg}}{\fbox{\parbox[c][3.2cm][c]{0.23\textwidth}{\centering img2.jpg\\(fine-tuned)}}} \\
-\IfFileExists{img3.jpg}{\includegraphics[width=0.23\textwidth]{img3.jpg}}{\fbox{\parbox[c][3.2cm][c]{0.23\textwidth}{\centering img3.jpg\\(freq only)}}} &
-\IfFileExists{img4.jpg}{\includegraphics[width=0.23\textwidth]{img4.jpg}}{\fbox{\parbox[c][3.2cm][c]{0.23\textwidth}{\centering img4.jpg\\(freq+obj)}}}
+\IfFileExists{img1.jpg}{\includegraphics[width=0.24\textwidth]{img1.jpg}}{\fbox{\parbox[c][3cm][c]{0.24\textwidth}{\centering Baseline}}} &
+\IfFileExists{img2.jpg}{\includegraphics[width=0.24\textwidth]{img2.jpg}}{\fbox{\parbox[c][3cm][c]{0.24\textwidth}{\centering Fine-tuned}}}
 \end{tabular}
-\caption{Qualitative comparison of detector outputs. Replace \texttt{img1.jpg}--\texttt{img4.jpg} with representative baseline and calibrated predictions.}
-\label{fig:qualitative_comparison}
+\caption{Comparison of baseline vs fine-tuned predictions. Fine-tuning reduces spurious detections and improves bounding box localization.}
 \end{figure}
 
-\paragraph{Confidence Calibration Analysis.}
-We observe a consistent left-shift in confidence after calibration:
-\begin{equation}
-    \Delta\mu = \mathbb{E}[\mathcal{S}_{\mathrm{raw}}]-\mathbb{E}[\mathcal{S}_{\mathrm{cal}}] > 0,
-\end{equation}
-indicating suppression of overconfident OoD detections. This behavior is stable across IoU thresholds (10\%, 20\%, 30\%), suggesting that the score correction is not due to random score collapse but targeted attenuation of unreliable predictions.
-
-\paragraph{Frequency--Objectness Relationship.}
-To verify the calibration hypothesis, we analyze the coupling between frequency energy and confidence-derived objectness proxy. Empirically, detections from high-frequency regions tend to have disproportionately high objectness estimates, supporting the presence of frequency-induced bias in one-stage detectors. This validates the need for a joint penalty that combines spectral and objectness information.
-
-To understand model behavior, we employ Grad-CAM, occlusion analysis, insertion/deletion metrics, pointing game, and frequency bias analysis. Grad-CAM highlights the most salient regions, occlusion reveals prediction sensitivity, insertion/deletion quantify explanation quality, pointing game measures localization, and frequency bias analysis checks whether the model relies on commonly occurring classes.
+Baseline predictions frequently include spurious detections in cluttered or high-texture regions. In contrast, the fine-tuned model produces cleaner predictions with improved localization and reduced false positives.
 
 \paragraph{Discussion.}
-Overall, the results demonstrate that: (i) frequency-aware suppression reduces texture-induced false detections, (ii) objectness-aware modulation provides additional stability and further lowers hallucination rate, and (iii) the combined method achieves up to $27.03\%$ FP reduction with minimal computational overhead. The approach is training-free at inference time, easy to integrate, and compatible with real-time YOLO-style detectors.
+Overall, results show that:
+(i) fine-tuning reduces hallucinations by improving objectness calibration,
+(ii) frequency-aware suppression further mitigates texture-induced false detections,
+(iii) the combined approach remains lightweight and suitable for real-time deployment.
 
 \subsection{Experiment 3}
 
