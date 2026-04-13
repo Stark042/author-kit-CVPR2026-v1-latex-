@@ -36,9 +36,32 @@ We quantify explanation quality using insertion and deletion curves. The inserti
 We further evaluate localization quality using the pointing game metric, which checks whether the most salient point in the Grad-CAM heatmap falls within the predicted object region.
 
 \paragraph{Frequency Bias Analysis.}
-To analyze potential biases, we examine the distribution of predicted classes and identify whether the model exhibits a tendency to favor frequently occurring categories. This helps assess whether fine-tuning reduces reliance on spurious correlations present in the training data.
+Let $\mathcal{C}$ denote the ID class set. We quantify class-frequency bias by comparing: (i) the empirical class prior from training data, $p_{\mathrm{tr}}(c)$, and (ii) the normalized predicted-class distribution on evaluation data, $\hat{p}(c)$:
+\begin{equation}
+    \hat{p}(c)=\frac{N_c}{\sum_{k\in\mathcal{C}}N_k}, \qquad c\in\mathcal{C},
+\end{equation}
+where $N_c$ is the number of detections assigned to class $c$ above threshold $\tau$.
 
-While the fine-tuning strategy improves robustness by reshaping the detector's decision boundary, it does not explicitly address the role of low-level signal characteristics at inference time. To further mitigate hallucinated detections, we introduce a lightweight post-hoc calibration mechanism applied directly to model predictions.
+We then compute a prior-alignment bias score using Kullback--Leibler divergence,
+\begin{equation}
+    B_{\mathrm{KL}} = D_{\mathrm{KL}}\!\left(\hat{p}\,\|\,p_{\mathrm{tr}}\right)
+    =\sum_{c\in\mathcal{C}}\hat{p}(c)\log\frac{\hat{p}(c)}{p_{\mathrm{tr}}(c)+\varepsilon},
+\end{equation}
+and a concentration score,
+\begin{equation}
+    B_{\mathrm{HHI}} = \sum_{c\in\mathcal{C}} \hat{p}(c)^2,
+\end{equation}
+where higher $B_{\mathrm{HHI}}$ indicates stronger collapse toward a few dominant classes. To isolate systematic bias toward frequent classes, we also report rank correlation between prediction mass and training frequency,
+\begin{equation}
+    \rho_{\mathrm{freq}} = \mathrm{corr}\!\left(\{\hat{p}(c)\}_{c\in\mathcal{C}},\{p_{\mathrm{tr}}(c)\}_{c\in\mathcal{C}}\right).
+\end{equation}
+Decreases in $B_{\mathrm{HHI}}$ and $\rho_{\mathrm{freq}}$ after fine-tuning indicate reduced reliance on dataset-frequency priors and improved class balance under shift.
+
+Although OoD-aware fine-tuning regularizes high-level semantics, it does not explicitly constrain low-level spectral artifacts at inference. Let a detection score be $s=g(z)$ for feature representation $z$. Under distribution shift, high-frequency nuisance components can perturb features, $z\mapsto z+\delta_{\mathrm{hf}}$, causing score inflation
+\begin{equation}
+    \Delta s \approx \nabla_z g(z)^\top\delta_{\mathrm{hf}} > 0
+\end{equation}
+for non-object regions. This motivates an explicit post-hoc correction term that penalizes detections with large spectral energy and high objectness proxy. Therefore, we apply a lightweight multiplicative calibration directly on predictions, which is training-free, architecture-agnostic, and designed to suppress hallucinated detections without degrading real-time inference.
 
 \paragraph{Motivation}
 Empirical observations from our experiments indicate that:
@@ -90,7 +113,7 @@ where $\mu_o,\sigma_o$ are mean and standard deviation of $o(s)$ estimated on va
 \paragraph{Calibration Function}
 For each detection with confidence $s$, we compute the calibrated score:
 \begin{equation}
-    s' = s \cdot \exp(-\alpha \hat{f}) \cdot \exp(-\beta o) \cdot \frac{1}{\gamma(a)}
+    s' = s \cdot \exp(-\alpha \hat{f}) \cdot \exp(-\beta \hat{o}) \cdot \frac{1}{\gamma(a)}
 \end{equation}
 where:
 \begin{itemize}
@@ -118,7 +141,7 @@ This ensures calibration only suppresses overconfident predictions.
 We evaluate two variants:
 \begin{itemize}
     \item \textbf{Frequency-only calibration}: $s' = s \cdot \exp(-\alpha \hat{f}) / \gamma(a)$,
-    \item \textbf{Frequency + Objectness calibration}: full formulation above.
+    \item \textbf{Frequency + Objectness calibration}: $s' = s \cdot \exp(-\alpha \hat{f}) \cdot \exp(-\beta \hat{o}) / \gamma(a)$.
 \end{itemize}
 
 \paragraph{Implementation Details}
