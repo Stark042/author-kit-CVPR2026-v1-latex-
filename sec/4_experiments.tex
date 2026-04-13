@@ -40,7 +40,7 @@ Let $\mathcal{C}$ denote the set of in-distribution (ID) classes. We analyze cla
 
 For a given model, let $N_c$ denote the number of detections assigned to class $c \in \mathcal{C}$ above confidence threshold $\tau$. We define the normalized predicted class distribution as:
 \begin{equation}
-    \hat{p}(c)=\frac{N_c}{\sum_{k\4in\mathcal{C}}N_k}, \qquad c\in\mathcal{C}.
+    \hat{p}(c)=\frac{N_c}{\sum_{k\in\mathcal{C}}N_k}, \qquad c\in\mathcal{C}.
 \end{equation}
 
 This provides an empirical estimate of how frequently each class is predicted by the detector under evaluation.
@@ -100,6 +100,10 @@ The calibration is applied post-hoc on detector outputs, requires no retraining,
 
 \paragraph{Key Insight.}
 This formulation introduces an explicit frequency-based regularization at inference time, complementing training-time OoD exposure.
+
+\subsection{Experiment 1}
+
+reserved
 
 \subsection{Experiment 2}
 
