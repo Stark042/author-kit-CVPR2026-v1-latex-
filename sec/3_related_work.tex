@@ -1,0 +1,43 @@
+\section{Related Work}
+\label{sec:related}
+
+Out-of-distribution (OoD) detection has emerged as a critical challenge in deploying deep learning systems in real-world environments, where models often encounter inputs that deviate from the training distribution.
+In image classification, OoD detection methods have been extensively studied, with approaches broadly categorized into confidence-based, distance-based, and generative techniques.
+Early works such as Maximum Softmax Probability (MSP) and energy-based methods leverage prediction confidence to distinguish OoD samples, while feature-space approaches such as Mahalanobis distance and k-nearest neighbors (KNN) model the distribution of intermediate representations to detect anomalies.
+These methods have shown strong performance in classification settings due to the relatively simple output structure.
+
+However, extending OoD detection to object detection remains significantly more challenging.
+Unlike classification, object detection involves multiple predictions per image along with spatial localization, leading to complex interactions between objectness estimation and class prediction.
+Prior works such as VOS, SAFE, and BAM adapt OoD detection to object detection frameworks, primarily focusing on two-stage detectors like Faster R-CNN.
+These approaches typically introduce additional scoring mechanisms or uncertainty estimation modules to filter out OoD predictions at inference time.
+More recent efforts have attempted to transfer classification-based OoD techniques to one-stage detectors such as YOLO, including methods based on maximum logits, energy scores, and feature distances.
+Despite these advancements, performance improvements remain limited, particularly due to the inherent differences between classification and detection pipelines.
+
+A critical limitation of existing approaches lies in their reliance on post-hoc filtering mechanisms.
+These methods treat OoD detection as an auxiliary task applied after the model has already generated predictions, which restricts their ability to prevent hallucinated detections.
+Furthermore, recent studies have highlighted significant issues in widely used OoD benchmarks for object detection.
+Specifically, evaluation datasets often suffer from label inconsistencies, where OoD images may contain in-distribution (ID) objects and vice versa.
+Such contamination leads to distorted evaluation metrics, particularly inflating false positive rates (FPR95), and undermines the reliability of reported results.
+Additionally, the presence of atypical or outlier samples within ID datasets further complicates threshold calibration, resulting in suboptimal decision boundaries.
+
+To address these limitations, recent work has shifted towards training-time mitigation strategies.
+Instead of relying solely on inference-time filtering, these approaches aim to reshape the model's decision boundary during training.
+A notable direction involves leveraging proximal OoD samples---data points that are semantically similar to ID classes but do not belong to them---to regularize the model.
+By explicitly training object detectors to treat such samples as background, the model learns a more conservative notion of objectness, thereby reducing overconfident predictions on OoD inputs.
+This paradigm draws parallels to adversarial training, where exposure to challenging inputs improves robustness by constraining the decision boundary.
+Empirical results demonstrate that such fine-tuning strategies can significantly reduce hallucinations while preserving in-distribution performance across different detector architectures.
+
+While these methods improve quantitative performance, they offer limited insight into \textit{why} such improvements occur.
+This highlights the importance of explainability in understanding model behavior under distribution shifts.
+Explainable AI (XAI) techniques such as Grad-CAM and occlusion sensitivity have been widely used to interpret convolutional neural networks by identifying regions of input that contribute most to predictions.
+In the context of object detection, these methods can reveal whether models rely on semantically meaningful features or spurious correlations.
+Additionally, bias analysis techniques, such as frequency bias detection, help uncover systematic tendencies of models to favor frequently occurring patterns in the training data, which can contribute to hallucinations under OoD conditions.
+
+Despite the growing body of work on OoD detection and mitigation, there remains a gap in understanding the behavioral changes induced by training-time strategies.
+In particular, there is limited analysis of how fine-tuning with proximal OoD data alters feature representations, attention patterns, and decision-making processes in object detectors.
+Addressing this gap is essential for building trustworthy and interpretable systems.
+
+In this work, we focus on explaining the improved OoD performance of a fine-tuned YOLOv10s model compared to its baseline counterpart.
+Rather than proposing a new detection method, we conduct a detailed empirical and explainability-driven analysis using Grad-CAM, occlusion methods, and frequency bias detection.
+Our study provides insights into how training-time mitigation reshapes model behavior, offering a deeper understanding of hallucination reduction in object detection systems.
+
