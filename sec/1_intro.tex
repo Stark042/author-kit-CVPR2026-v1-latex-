@@ -7,38 +7,20 @@ Recent work, including \textit{Revisiting Out-of-Distribution Detection in Real-
 
 Deep neural networks are known to exhibit spectral bias, favoring certain frequency components in input data. In the context of object detection, this leads to an over-reliance on high-frequency textures and fine-grained patterns, which may not correspond to semantically meaningful objects. Furthermore, small bounding boxes often lack sufficient contextual information, making them more prone to misclassification and inflated objectness scores.
 
-In this work, we explore the hypothesis that frequency characteristics and object scale jointly influence hallucination behavior in object detectors. Through empirical analysis, we observe that:
+In this work, we address hallucinated detections in OoD settings through a combination of post-hoc calibration and explainability-driven analysis. Rather than relying on architectural changes or retraining strategies, we focus on lightweight inference-time corrections and behavioral diagnostics of detection models.
+
+We propose a frequency-aware calibration mechanism that operates directly on detection outputs. This method suppresses spurious detections by penalizing high-frequency regions using Laplacian-based energy estimation, combined with size-aware suppression for small bounding boxes. The resulting correction is applied post-hoc to predicted confidence scores, making the method training-free, model-agnostic, and compatible with real-time YOLO-based detectors.
+
+To better understand model behavior under distribution shift, we complement our calibration approach with explainability techniques. We use Grad-CAM to visualize spatial regions influencing detector predictions, and occlusion sensitivity analysis to evaluate how local perturbations affect confidence and localization stability.
+
+To validate the effectiveness of the proposed framework, we conduct experiments on both in-distribution (Pascal VOC) and OoD datasets constructed from Caltech-256. We evaluate performance using the following metrics and analysis tools:
 
 \begin{itemize}
-    \item High-frequency regions (e.g., textured backgrounds) frequently trigger false positives
-    \item Small object proposals exhibit unstable and overconfident objectness scores
-    \item These effects are amplified in OoD settings
+    \item Hallucination Rate (HR) and False Positive (FP) reduction under OoD settings
+    \item Confidence distribution shifts between baseline and calibrated models
+    \item Intersection-over-Union (IoU) based localization consistency
+    \item Pointing Game metric for spatial alignment evaluation
+    \item Insertion and Deletion curves for explanation faithfulness
 \end{itemize}
 
-Motivated by these observations, we propose a frequency-aware objectness calibration mechanism that operates at the detection level. Our approach introduces:
-
-\begin{itemize}
-    \item Frequency-based penalties using Laplacian energy
-    \item Objectness-aware suppression to control overconfident predictions
-    \item Size-aware regularization for small bounding boxes
-\end{itemize}
-
-Unlike prior methods, our framework is:
-
-\begin{itemize}
-    \item Model-agnostic (works with YOLO variants)
-    \item Training-free (post-hoc calibration)
-    \item Low-compute (suitable for resource-constrained settings)
-\end{itemize}
-
-To validate our approach, we conduct extensive experiments on both in-distribution (Pascal VOC) and OoD datasets constructed from Caltech-256. We evaluate performance using:
-
-\begin{itemize}
-    \item Hallucination Rate (HR) and false positive reduction
-    \item Confidence distribution shifts
-    \item Explainability metrics (Occlusion Sensitivity, Pointing Game)
-    \item Faithfulness metrics (Insertion/Deletion AUC)
-    \item Localization consistency via Grad-CAM
-\end{itemize}
-
-Our results show that frequency-aware calibration significantly reduces hallucinations while improving interpretability, providing both practical improvements and diagnostic insights into OoD behavior.
+Our results demonstrate that frequency-aware calibration consistently reduces hallucinated detections while improving interpretability of model behavior under distribution shift. The combination of lightweight post-hoc correction and explainability analysis provides both practical improvements and deeper insights into failure modes of object detectors in OoD environments.
